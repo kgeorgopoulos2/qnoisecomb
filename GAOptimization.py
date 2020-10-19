@@ -18,7 +18,7 @@ from qiskit.providers.aer.noise import NoiseModel
 from qiskit.providers.aer import noise
 
 # Import other necessary Python files
-import SimRunQW
+import simRunQW
 
 
 def singleQubitErrorRates():
@@ -228,20 +228,37 @@ def getDecoherenceTimes():
 
     return T1s,T2s
 
-def thermalRelaxationChannel():
+def getSQGateExecutionTime(gate, backend):
+    '''Returns the average execution time of the single-qubit type gates we are interested in.'''
+    # Single qubit gates
+    s = [0]*15
+    for i in range(0,15):
+        s[i] = backend.properties().gate_length(gate, [i])
+
+    return (np.mean(s)*(10**9))
+
+def getTQGateExecutionTime(gate, backend):
+    '''Returns the average execution time of the two-qubit type gates in the circuit.'''
+    # Two qubit gates
+    graph = [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [7,8], [8,9], [9,10], [10,11], [11,12], [12,13], [13,14],
+            [0,14], [1,13], [2,12], [3,11], [4,10], [5,9], [6,8]]
+
+    t = [0]*len(graph)
+    for i in range(0,len(graph)):
+        t[i] = backend.properties().gate_length('cx', graph[i])
+
+    return (np.mean(t)*(10**9))
+
+def thermalRelaxationChannel(backend):
     '''Method that returns the thermal relaxation error quantum channel.'''
     # T1 and T2
     T1s,T2s = getDecoherenceTimes()
-    
-    # Gaussian pulse times, aka execution time, for CNOT gates (in nanoseconds).
-    TCXs = {'Q1_0':239,'Q1_2':174,'Q2_3':261,'Q4_3':266,'Q5_4':300,'Q5_6':300,'Q7_8':220,'Q9_8':434,'Q9_10':300,'Q11_10':261,
-            'Q11_12':261,'Q13_12':300,'Q13_1':652,'Q12_2':1043,'Q11_3':286,'Q4_10':261,'Q5_9':348,'Q6_8':348}
 
     # Instruction times (in nanoseconds)
     time_u1 = 10 # virtual gate
-    time_u2 = 50 # (single X90 pulse)
-    time_u3 = 100 # (two X90 pulses)
-    time_cx = 239 # Only interested in 'Q1_0'
+    time_u2 = getSQGateExecutionTime('u2', backend) # Average of all u2 times
+    time_u3 = getSQGateExecutionTime('u3', backend) # Average of all u3 times
+    time_cx = getTQGateExecutionTime('cx', backend) # Average of all cx times
     time_reset = 1000  # 1 microsecond
     time_measure = 1000 # 1 microsecond
 
@@ -529,8 +546,8 @@ def hd_evaluate(solution):
     
     # Run simulation with the rates
     iterations = 1000 # Probably always fixed on 1,000
-    counts = SimRunQW.combinedExecute(iterations, thermal, num_q, ratesList)
-    counts = SimRunQW.getCombinedCounts(counts, iterations)
+    counts = simRunQW.combinedExecute(iterations, thermal, num_q, ratesList)
+    counts = simRunQW.getCombinedCounts(counts, iterations)
     counts = dict(OrderedDict(sorted(counts.items())))
     
     # Format the returned distributions in a way that we can calculate the Hellinger Distance
@@ -737,7 +754,7 @@ def optimise():
 
     # Run simulation with the best error rates resulting from the GA
     post_counts = combinedExecute(iterations, True, num_q, bestRates)
-    post_counts = SimRunQW.getCombinedCounts(post_counts, iterations)
+    post_counts = simRunQW.getCombinedCounts(post_counts, iterations)
     post_counts = dict(OrderedDict(sorted(post_counts.items())))
     print(post_counts)
 
