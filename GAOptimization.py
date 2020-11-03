@@ -21,33 +21,115 @@ from qiskit.providers.aer import noise
 import simRunQW
 
 
-def singleQubitErrorRates():
+def singleQubitErrorRates(data):
     '''Returns as a dictionary the single qubit error rates, as they appear on ibmq_16_melbourne. NOTE: the 
     values deviate every time the machine gets callibrated.'''
-    sqRates = {'Q0': 5.71e-04, 'Q1': 1.68e-03, 'Q2': 9.55e-04, 'Q3': 3.81e-04, 'Q4': 1.39e-03, 'Q5': 4.02e-03, 'Q6': 9.44e-04, 'Q7': 1.41e-03, 
-               'Q8': 1.59e-03, 'Q9': 1.86e-03, 'Q10': 1.11e-03, 'Q11': 4.76e-03, 'Q12': 7.89e-04, 'Q13': 3.47e-03, 'Q14': 1.16e-03}
+    qubits = data.Qubit.tolist()
+    del qubits[0]
+    rates = data.SQError.tolist()
+    del rates[0]
+    sqRates = dict(zip(qubits, rates))
     
     return sqRates
 
-def twoQubitErrorRates():
+def twoQubitErrorRates(data):
     '''Returns as a dictionary the two qubit error rates, as they appear on ibmq_16_melbourne. NOTE: the values 
     deviate every time the machine gets callibrated.'''
-    tqRates = {'Q0_1': 1.696e-2, 'Q0_14': 3.922e-2, 'Q1_0': 1.696e-2, 'Q1_2': 2.075e-2, 'Q1_13': 8.575e-2, 'Q2_1': 2.075e-2, 'Q2_3': 2.114e-2, 
-               'Q2_12': 3.469e-2, 'Q3_2': 2.114e-2, 'Q3_4': 2.456e-2, 'Q3_11': 4.271e-2, 'Q4_3': 2.456e-2, 'Q4_5': 4.079e-2, 'Q4_10': 3.358e-2, 
-               'Q5_4': 4.079e-2, 'Q5_6': 6.169e-2, 'Q5_9': 4.918e-2, 'Q6_5': 6.169e-2, 'Q6_8': 3.313e-2, 'Q7_8': 3.676e-2, 'Q8_6': 3.313e-2, 
-               'Q8_7': 3.676e-2, 'Q8_9': 4.802e-2, 'Q9_5': 4.918e-2, 'Q9_8': 4.802e-2, 'Q9_10': 3.832e-2, 'Q10_4': 3.358e-2, 'Q10_9': 3.832e-2, 
-               'Q10_11': 4.111e-2, 'Q11_3': 4.271e-2, 'Q11_10': 4.111e-2, 'Q11_12': 4.362e-2, 'Q12_2': 3.469e-2, 'Q12_11': 4.362e-2, 'Q12_13': 4.116e-2, 
-               'Q13_1': 8.575e-2, 'Q13_12': 4.116e-2, 'Q13_14': 6.461e-2, 'Q14_0': 3.922e-2, 'Q14_13': 6.461e-2}
+    tqer = data.TQError.tolist()
+    del tqer[0]
+
+    qpairs = []
+    qvals = []
+    for i in range(0, len(tqer)):
+        tqer[i] = tqer[i].replace("cx", "Q")
+
+        s = tqer[i].split(",")
+        for j in range(0, len(s)):
+            t = s[j].split(":")
+            qpairs.append(t[0].replace(" ", ""))
+            qvals.append(float(t[1].replace(" ", "")))
+
+    tqRates = dict(zip(qpairs, qvals))
     
     return tqRates
 
-def measureErrorRates():
+def measureErrorRates(data):
     '''Returns as a dictionary the measurement error rates, as they appear on ibmq_16_melbourne. NOTE: the values
     deviate every time the machine gets callibrated'''
-    measRates = {'Q0': 1.95e-02, 'Q1': 6.45e-02, 'Q2': 2.64e-01, 'Q3': 4.55e-02, 'Q4': 5.85e-02, 'Q5': 6.30e-02, 'Q6': 1.37e-01, 'Q7': 3.25e-02, 
-                 'Q8': 2.74e-01, 'Q9': 4.40e-02, 'Q10': 4.20e-02, 'Q11': 4.00e-02, 'Q12': 4.35e-02, 'Q13': 1.22e-01, 'Q14': 8.45e-02}
+    qubits = data.Qubit.tolist()
+    del qubits[0]
+    rates = data.ReadoutError.tolist()
+    del rates[0]
+    measRates = dict(zip(qubits, rates))
     
     return measRates
+
+def getDecoherenceTimes(data):
+    '''Returns the thermal relaxation time T1 and the qubit dephasing time T2, as given by IBMQ.'''
+    t1er = data.T1.tolist()
+    del t1er[0]
+    t2er = data.T2.tolist()
+    del t2er[0]
+
+    for i in range(0, len(t1er)):
+        t1er[i] = float(t1er[i] + "e3")
+        t2er[i] = float(t2er[i] + "e3")
+
+    T1s = np.array(t1er)
+    T2s = np.array(t2er)
+    
+    # Check for error in IBMQ's measurements (i.e it must always be T2 <= 2T1)
+    c = 0
+    for i in range(0,len(T1s)):
+        if (T2s[i] > 2*T1s[i]):
+            c = 1
+            print("ERROR: incompatible decay rates - Qubit Q", i, ", T2 =", T2s[i], "and T1 =", T1s[i])
+    if (c == 0):
+        print(r'Checking decoherence times: all ok')
+
+    return T1s,T2s
+
+def noisyGate(line):
+    '''Simulates a bit-flip channel. With a randomely generated probability p an X gate is chosen,
+    whereas with (1-p) the Identity is chosen. The probability of error is chosen according to the
+    qubit selected each time.'''
+    sqRates = singleQubitErrorRates() # Dictionary containing the single qubit error rates
+    tqRates = twoQubitErrorRates() # Dictionary containing the two qubit error rates
+    
+    # Generate the operation according to single- or two-qubit error rates
+    if (("u1" in line) or ("u2" in line) or ("u3" in line) or (".x" in line)):
+        s = line.split('[')
+        s = s[1].split(']')
+        qubit = ("Q" + s[0])
+        op = list(np.random.choice(["X", "I"], 1, p=[sqRates[qubit], 1-sqRates[qubit]]))
+    elif ("cx" in line):
+        s = line.split('(')
+        s = s[1].split(',')
+        s0 = s[0].split('[')
+        s0 = s0[1].split(']')
+        q1 = s0[0]
+        s0 = s[1].split('[')
+        s0 = s0[1].split(']')
+        q2 = s0[0]
+        qubits = ("Q" + q1 + "_" + q2)
+        op = list(np.random.choice(["X", "I"], 1, p=[tqRates[qubits], 1-tqRates[qubits]]))
+    
+    return op
+
+def noisyMeasure(line):
+    '''Simulates the noisey measurement. The probability is chosen according to the qubit being measured. The
+    argument `line` is a string containing the line of code that this  '''
+    measRates = measureErrorRates() # Dictionary containing the measurement error rates per qubit
+    
+    # Find out which qubit is being measured
+    s = line.split('q')
+    s = s[1].split('[')
+    s = s[1].split(']')
+    qubit = ("Q" + s[0])
+    
+    op = list(np.random.choice(["X", "I"], 1, p=[measRates[qubit], 1-measRates[qubit]]))
+    
+    return op
 
 def qwQASM(path):
     '''Runs the formatted python file from the path and returns the circuit.'''
@@ -62,6 +144,16 @@ def noiseFreeqwQASM(path):
     %run -i path
     
     return circ
+
+def machineData(path):
+    '''Imports the error rates of the machine as the downloaded csv file. path - the path to the csv file, including
+    the name of the csv file and ".csv".'''
+    
+    colnames = ["Qubit", "T1", "T2", "Frequency", "ReadoutError", "SQError", "TQError", "Date"]
+    
+    data = pandas.read_csv(path, names=colnames)
+    
+    return data
 
 def getQState(qwalk):
     '''Method to get the quantum state before the measurement. This is in particular
@@ -209,24 +301,6 @@ def getAvgData(data):
         avg_dct[key] = sm/len(data)
     
     return avg_dct
-
-def getDecoherenceTimes():
-    '''Returns the thermal relaxation time T1 and the qubit dephasing time T2, as given by IBMQ.'''
-    T1s = np.array([74.23838825e3,68.22924559e3,65.01988555e3,91.28537365e3,73.08114205e3,17.48300992e3,69.52396264e3,49.65044327e3,
-                    34.33470165e3,43.30590001e3,63.50403243e3,64.19714603e3,113.1429351e3,19.70670524e3,39.86930866e3])
-    T2s = np.array([20.19605914e3,117.5417994e3,95.92651069e3,66.23117255e3,29.66167823e3,32.30802901e3,85.45715624e3,88.21382209e3,
-                    47.45448009e3,78.01128174e3,60.19670516e3,29.65842312e3,59.08840315e3,24.24017627e3,45.05018866e3])
-    
-    # Check for error in IBMQ's measurements (i.e it must always be T2 <= 2T1)
-    c = 0
-    for i in range(0,len(T1s)):
-        if (T2s[i] > 2*T1s[i]):
-            c = 1
-            print("ERROR: incompatible decay rates - Qubit Q", i, ", T2 =", T2s[i], "and T1 =", T1s[i])
-    if (c == 0):
-        print(r'Checking decoherence times: all ok')
-
-    return T1s,T2s
 
 def getSQGateExecutionTime(gate, backend):
     '''Returns the average execution time of the single-qubit type gates we are interested in.'''

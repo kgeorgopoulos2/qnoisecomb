@@ -12,12 +12,19 @@ from qiskit.providers.aer import noise
 
 import CreateCircuit
 
-def getDecoherenceTimes():
+def getDecoherenceTimes(data):
     '''Returns the thermal relaxation time T1 and the qubit dephasing time T2, as given by IBMQ.'''
-    T1s = np.array([74.23838825e3,68.22924559e3,65.01988555e3,91.28537365e3,73.08114205e3,17.48300992e3,69.52396264e3,49.65044327e3,
-                    34.33470165e3,43.30590001e3,63.50403243e3,64.19714603e3,113.1429351e3,19.70670524e3,39.86930866e3])
-    T2s = np.array([20.19605914e3,117.5417994e3,95.92651069e3,66.23117255e3,29.66167823e3,32.30802901e3,85.45715624e3,88.21382209e3,
-                    47.45448009e3,78.01128174e3,60.19670516e3,29.65842312e3,59.08840315e3,24.24017627e3,45.05018866e3])
+    t1er = data.T1.tolist()
+    del t1er[0]
+    t2er = data.T2.tolist()
+    del t2er[0]
+
+    for i in range(0, len(t1er)):
+        t1er[i] = float(t1er[i] + "e3")
+        t2er[i] = float(t2er[i] + "e3")
+
+    T1s = np.array(t1er)
+    T2s = np.array(t2er)
     
     # Check for error in IBMQ's measurements (i.e it must always be T2 <= 2T1)
     c = 0
@@ -25,12 +32,25 @@ def getDecoherenceTimes():
         if (T2s[i] > 2*T1s[i]):
             c = 1
             print("ERROR: incompatible decay rates - Qubit Q", i, ", T2 =", T2s[i], "and T1 =", T1s[i])
+    if (c == 0):
+        print(r'Checking decoherence times: all ok')
 
     return T1s,T2s
+
+def machineData(path):
+    '''Imports the error rates of the machine as the downloaded csv file. path - the path to the csv file, including
+    the name of the csv file and ".csv".'''
+    
+    colnames = ["Qubit", "T1", "T2", "Frequency", "ReadoutError", "SQError", "TQError", "Date"]
+    
+    data = pandas.read_csv(path, names=colnames)
+    
+    return data
 
 def thermalRelaxationError():
     '''Method that returns the thermal relaxation error quantum channel.'''
     # T1 and T2
+    data = machineData(path)
     T1s,T2s = getDecoherenceTimes()
     
     # Gaussian pulse times, aka execution time, for CNOT gates (in nanoseconds).
