@@ -521,48 +521,26 @@ def paramEncoding(scalar, *param):
 
 def decode(solution, scalar, num_rates, num_q):
     '''Decodes a solution/chromosome to its component error rates.'''
-    # Decode genetic algorithm solution to error rates
-    decoded_Q0Rate_bits = solution[0:(int(len(solution)/num_rates))]
-    decoded_Q1Rate_bits = solution[(int(len(solution)/num_rates)):2*(int(len(solution)/num_rates))]
-    decoded_Q2Rate_bits = solution[2*(int(len(solution)/num_rates)):3*(int(len(solution)/num_rates))]
-    decoded_CNOT0_1Rate_bits = solution[3*(int(len(solution)/num_rates)):4*(int(len(solution)/num_rates))]
-    decoded_CNOT1_2Rate_bits = solution[4*(int(len(solution)/num_rates)):5*(int(len(solution)/num_rates))]
-    decoded_M0Rate_bits = solution[5*(int(len(solution)/num_rates)):6*(int(len(solution)/num_rates))]
-    decoded_M1Rate_bits = solution[6*(int(len(solution)/num_rates)):7*(int(len(solution)/num_rates))]
-    decoded_M2Rate_bits = solution[7*(int(len(solution)/num_rates)):8*(int(len(solution)/num_rates))]
+    decoded_bits = [None]*num_rates
+    decoded_rates = [None]*num_rates
     
+    # Decode genetic algorithm solution to error rates
+    for i in range(0, num_rates):
+        decoded_bits[i] = solution[i*(int(len(solution)/num_rates)):(i+1)*(int(len(solution)/num_rates))]
+        
     ### Fixes for the chromosome representation ###
-    for i in range(0,len(decoded_Q0Rate_bits)):
-        decoded_Q0Rate_bits[i] = str(decoded_Q0Rate_bits[i])
-        decoded_Q1Rate_bits[i] = str(decoded_Q1Rate_bits[i])
-        decoded_Q2Rate_bits[i] = str(decoded_Q2Rate_bits[i])
-        decoded_CNOT0_1Rate_bits[i] = str(decoded_CNOT0_1Rate_bits[i])
-        decoded_CNOT1_2Rate_bits[i] = str(decoded_CNOT1_2Rate_bits[i])
-        decoded_M0Rate_bits[i] = str(decoded_M0Rate_bits[i])
-        decoded_M1Rate_bits[i] = str(decoded_M1Rate_bits[i])
-        decoded_M2Rate_bits[i] = str(decoded_M2Rate_bits[i])
-    decoded_Q0Rate_bits = "".join(decoded_Q0Rate_bits)
-    decoded_Q1Rate_bits = "".join(decoded_Q1Rate_bits)
-    decoded_Q2Rate_bits = "".join(decoded_Q2Rate_bits)
-    decoded_CNOT0_1Rate_bits = "".join(decoded_CNOT0_1Rate_bits)
-    decoded_CNOT1_2Rate_bits = "".join(decoded_CNOT1_2Rate_bits)
-    decoded_M0Rate_bits = "".join(decoded_M0Rate_bits)
-    decoded_M1Rate_bits = "".join(decoded_M1Rate_bits)
-    decoded_M2Rate_bits = "".join(decoded_M2Rate_bits)
+    for j in range(0, len(decoded_bits[0])):
+        for i in range (0, num_rates):
+            decoded_bits[i][j] = str(decoded_bits[i][j])
+    
+    for i in range(0, num_rates):
+        decoded_bits[i] = "".join(decoded_bits[i])
     ###############################################
     
-    decoded_Q0Rate = int(decoded_Q0Rate_bits, 2)/scalar
-    decoded_Q1Rate = int(decoded_Q1Rate_bits, 2)/scalar
-    decoded_Q2Rate = int(decoded_Q2Rate_bits, 2)/scalar
-    decoded_CNOT0_1Rate = int(decoded_CNOT0_1Rate_bits, 2)/scalar
-    decoded_CNOT1_2Rate = int(decoded_CNOT1_2Rate_bits, 2)/scalar
-    decoded_M0Rate = int(decoded_M0Rate_bits, 2)/scalar
-    decoded_M1Rate = int(decoded_M1Rate_bits, 2)/scalar
-    decoded_M2Rate = int(decoded_M2Rate_bits, 2)/scalar
+    for i in range(0, num_rates):
+        decoded_rates[i] = int(decoded_bits[i], 2)/scalar
     
-    decodedRates = [decoded_Q0Rate, decoded_Q1Rate, decoded_Q2Rate, decoded_CNOT0_1Rate, decoded_CNOT1_2Rate, decoded_M0Rate, decoded_M1Rate, decoded_M2Rate]
-    
-    return decodedRates
+    return decoded_rates
 
 def hd_evaluate(solution):
     '''Function that evaluates the fitness of the new generation using Hellinger distance as the fitness function.
@@ -578,45 +556,7 @@ def hd_evaluate(solution):
     thermal = False
         
     # Decode genetic algorithm solution to error rates
-    decoded_Q0Rate_bits = list(solution[0:(int(len(solution)/num_rates))])
-    decoded_Q1Rate_bits = solution[(int(len(solution)/num_rates)):2*(int(len(solution)/num_rates))]
-    decoded_Q2Rate_bits = solution[2*(int(len(solution)/num_rates)):3*(int(len(solution)/num_rates))]
-    decoded_CNOT0_1Rate_bits = solution[3*(int(len(solution)/num_rates)):4*(int(len(solution)/num_rates))]
-    decoded_CNOT1_2Rate_bits = solution[4*(int(len(solution)/num_rates)):5*(int(len(solution)/num_rates))]
-    decoded_M0Rate_bits = solution[5*(int(len(solution)/num_rates)):6*(int(len(solution)/num_rates))]
-    decoded_M1Rate_bits = solution[6*(int(len(solution)/num_rates)):7*(int(len(solution)/num_rates))]
-    decoded_M2Rate_bits = solution[7*(int(len(solution)/num_rates)):8*(int(len(solution)/num_rates))]
-        
-    ### Fixes for the chromosome representation ###
-    for i in range(0,len(decoded_Q0Rate_bits)):
-        decoded_Q0Rate_bits[i] = str(decoded_Q0Rate_bits[i])
-        decoded_Q1Rate_bits[i] = str(decoded_Q1Rate_bits[i])
-        decoded_Q2Rate_bits[i] = str(decoded_Q2Rate_bits[i])
-        decoded_CNOT0_1Rate_bits[i] = str(decoded_CNOT0_1Rate_bits[i])
-        decoded_CNOT1_2Rate_bits[i] = str(decoded_CNOT1_2Rate_bits[i])
-        decoded_M0Rate_bits[i] = str(decoded_M0Rate_bits[i])
-        decoded_M1Rate_bits[i] = str(decoded_M1Rate_bits[i])
-        decoded_M2Rate_bits[i] = str(decoded_M2Rate_bits[i])
-    decoded_Q0Rate_bits = "".join(decoded_Q0Rate_bits)
-    decoded_Q1Rate_bits = "".join(decoded_Q1Rate_bits)
-    decoded_Q2Rate_bits = "".join(decoded_Q2Rate_bits)
-    decoded_CNOT0_1Rate_bits = "".join(decoded_CNOT0_1Rate_bits)
-    decoded_CNOT1_2Rate_bits = "".join(decoded_CNOT1_2Rate_bits)
-    decoded_M0Rate_bits = "".join(decoded_M0Rate_bits)
-    decoded_M1Rate_bits = "".join(decoded_M1Rate_bits)
-    decoded_M2Rate_bits = "".join(decoded_M2Rate_bits)
-    ###############################################
-    
-    Q0Rate = int(decoded_Q0Rate_bits, 2)/scalar
-    Q1Rate = int(decoded_Q1Rate_bits, 2)/scalar
-    Q2Rate = int(decoded_Q2Rate_bits, 2)/scalar
-    CNOT0_1Rate = int(decoded_CNOT0_1Rate_bits, 2)/scalar
-    CNOT1_2Rate = int(decoded_CNOT1_2Rate_bits, 2)/scalar
-    M0Rate = int(decoded_M0Rate_bits, 2)/scalar
-    M1Rate = int(decoded_M1Rate_bits, 2)/scalar
-    M2Rate = int(decoded_M2Rate_bits, 2)/scalar
-    
-    ratesList = [Q0Rate, Q1Rate, Q2Rate, CNOT0_1Rate, CNOT1_2Rate, M0Rate, M1Rate, M2Rate]
+    ratesList = decode(solution, scalar, num_rates, num_q)
     
     # Run simulation with the rates
     iterations = 1000 # Probably always fixed on 1,000
@@ -635,60 +575,13 @@ def hd_evaluate(solution):
     
     return fitness,
 
-def getBest(population, scalar):
+def getBest(population, scalar, num_rates, num_q):
     '''Returns the best solution generated by the optimization procedure.'''
     best_individuals = tools.selBest(population, k = 1)
-    num_rates = 8
-    best_Q0Rate = None
-    best_Q1Rate = None
-    best_Q2Rate = None
-    best_CNOT0_1Rate = None
-    best_CNOT1_2Rate = None
-    best_M0Rate = None
-    best_M1Rate = None
-    best_M2Rate = None
 
     for bi in best_individuals:
         # Decode genetic algorithm solution to error rates
-        Q0Rate_bits = bi[0:(int(len(bi)/num_rates))]
-        Q1Rate_bits = bi[(int(len(bi)/num_rates)):2*(int(len(bi)/num_rates))]
-        Q2Rate_bits = bi[2*(int(len(bi)/num_rates)):3*(int(len(bi)/num_rates))]
-        CNOT0_1Rate_bits = bi[3*(int(len(bi)/num_rates)):4*(int(len(bi)/num_rates))]
-        CNOT1_2Rate_bits = bi[4*(int(len(bi)/num_rates)):5*(int(len(bi)/num_rates))]
-        M0Rate_bits = bi[5*(int(len(bi)/num_rates)):6*(int(len(bi)/num_rates))]
-        M1Rate_bits = bi[6*(int(len(bi)/num_rates)):7*(int(len(bi)/num_rates))]
-        M2Rate_bits = bi[7*(int(len(bi)/num_rates)):8*(int(len(bi)/num_rates))]
-
-        ### Fixes for the chromosome representation ###
-        for i in range(0,len(Q0Rate_bits)):
-            Q0Rate_bits[i] = str(Q0Rate_bits[i])
-            Q1Rate_bits[i] = str(Q1Rate_bits[i])
-            Q2Rate_bits[i] = str(Q2Rate_bits[i])
-            CNOT0_1Rate_bits[i] = str(CNOT0_1Rate_bits[i])
-            CNOT1_2Rate_bits[i] = str(CNOT1_2Rate_bits[i])
-            M0Rate_bits[i] = str(M0Rate_bits[i])
-            M1Rate_bits[i] = str(M1Rate_bits[i])
-            M2Rate_bits[i] = str(M2Rate_bits[i])
-        Q0Rate_bits = "".join(Q0Rate_bits)
-        Q1Rate_bits = "".join(Q1Rate_bits)
-        Q2Rate_bits = "".join(Q2Rate_bits)
-        CNOT0_1Rate_bits = "".join(CNOT0_1Rate_bits)
-        CNOT1_2Rate_bits = "".join(CNOT1_2Rate_bits)
-        M0Rate_bits = "".join(M0Rate_bits)
-        M1Rate_bits = "".join(M1Rate_bits)
-        M2Rate_bits = "".join(M2Rate_bits)
-        ###############################################
-
-        best_Q0Rate = int(Q0Rate_bits, 2)/scalar
-        best_Q1Rate = int(Q1Rate_bits, 2)/scalar
-        best_Q2Rate = int(Q2Rate_bits, 2)/scalar
-        best_CNOT0_1Rate = int(CNOT0_1Rate_bits, 2)/scalar
-        best_CNOT1_2Rate = int(CNOT1_2Rate_bits, 2)/scalar
-        best_M0Rate = int(M0Rate_bits, 2)/scalar
-        best_M1Rate = int(M1Rate_bits, 2)/scalar
-        best_M2Rate = int(M2Rate_bits, 2)/scalar
-        
-        bestRates = [best_Q0Rate, best_Q1Rate, best_Q2Rate, best_CNOT0_1Rate, best_CNOT1_2Rate, best_M0Rate, best_M1Rate, best_M2Rate]
+        best_rates = decode(bi, scalar, num_rates, num_q)
         
     return bestRates
 
@@ -753,7 +646,7 @@ def runGA(population_size, num_generations, gene_length, scalar, chromosome, num
     print("\nTime elapsed:", end_time - start_time, "seconds.")
     
     # Get the error rates that perform the best
-    bestRates = getBest(population, scalar)
+    bestRates = getBest(population, scalar, num_rates, num_q)
     
     return bestRates
 
