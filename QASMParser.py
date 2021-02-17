@@ -1,4 +1,4 @@
-def getQASMCode(device, job_id, path):
+def getQASMCode(device, job_id, path, filename):
     '''Retrieves the QASM code from the IBMQ backend. Args: device - the device on which the experiment was run, job_id - the
     id of the job, path - the name of the path we want the code writen.'''
     
@@ -14,17 +14,17 @@ def getQASMCode(device, job_id, path):
     jobs = disassemble(qob)
     qc = jobs[0][0]
 
-    with open(path + ".txt", 
+    with open(path + "/" + filename + ".txt", 
               mode='wt', encoding='utf-8') as myfile:
         myfile.write(qc.qasm())
     
     return None
 
-def QASMtoPython():
+def QASMtoPython(path):
     '''Function that formats a txt file containing QASM code and outputs a txt file containing Python
     code, able to run on Qiskit.'''
     file = input("Please provide the name of the file: ")
-    filename = ("/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/QASM/" + file + ".txt")
+    filename = (path + file + ".txt")
     
     # Import file and make each line a string in a list. Remember, all files must be in the QASM folder.
     with open(filename) as f:
@@ -54,16 +54,22 @@ def QASMtoPython():
             s[3] = s[3].replace(';', ')')
             lines[i] = "circ." + s[0] + "(" + s[1] + s[2] + " " + s[3]
             
-        with open("/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/QASM/Formatted" + file + ".txt", 
+        with open(path + "Formatted" + file + ".txt", 
                   mode='wt', encoding='utf-8') as myfile:
             myfile.write('\n'.join(lines))
+        myfile.close()
+            
+        with open(path + "NoiseFreeFormatted" + file + ".py", 
+                  mode='wt', encoding='utf-8') as myfile:
+            myfile.write('\n'.join(lines))
+        myfile.close()
             
     return ("Formatted" + file)
             
-def AddQuantumErrors(file):
+def AddQuantumErrors(path, file):
     '''This function adds the probabilistic quantum errors that create the dephasing noise.'''
     # Read in the file and prepare it
-    filename = (file + ".txt")
+    filename = (path + file + ".txt")
     with open(filename) as f:
         content = f.readlines()
     lines = [x.strip('\n') for x in content]
@@ -79,7 +85,7 @@ def AddQuantumErrors(file):
             s = s[1].split(']')
             q = s[0]
             lines[i+1] = ("line = '" + lines[i] + "'" + "\r\n" + 
-                          "op = noisyGate(line)" + "\r\n" + 
+                          "op = noisyGate(line, sqRates, tqRates)" + "\r\n" + 
                           "if (op == ['X']):" +
                           "\r\t" + "dep = list(np.random.choice(['X', 'Z', 'Y'], p=[0.5,0.1,0.4]))" +
                           "\r\t" + "if (dep == ['X']):" +
@@ -98,7 +104,7 @@ def AddQuantumErrors(file):
             s0 = s0[1].split(']')
             q2 = s0[0]
             lines[i+1] = ("line = '" + lines[i] + "'" + "\r\n" + 
-                          "op = noisyGate(line)" + "\r\n" + 
+                          "op = noisyGate(line, sqRates, tqRates)" + "\r\n" + 
                           "if (op == ['X']):" +
                           "\r\t" + "dep = list(np.random.choice(['X', 'Z', 'Y'], p=[0.5,0.1,0.4]))" +
                           "\r\t" + "if (dep == ['X']):" +
@@ -112,7 +118,7 @@ def AddQuantumErrors(file):
             s = s[1].split(']')
             q = s[0]
             lines[i+1] = ("line = '" + lines[i] + "'" + "\r\n" + 
-                          "op = noisyGate(line)" + "\r\n" + 
+                          "op = noisyGate(line, sqRates, tqRates)" + "\r\n" + 
                           "if (op == ['X']):" +
                           "\r\t" + "dep = list(np.random.choice(['X', 'Z', 'Y'], p=[0.5,0.1,0.4]))" +
                           "\r\t" + "if (dep == ['X']):" +
@@ -127,7 +133,7 @@ def AddQuantumErrors(file):
             s = s[1].split(']')
             q = s[0]
             lines[i-1] = ("line = '" + lines[i] + "'" + "\r\n" + 
-                          "op = noisyMeasure(line)" + "\r\n" + 
+                          "op = noisyMeasure(line, measRates)" + "\r\n" + 
                           "if (op == ['X']):" +
                           "\r\t" + "circ.x(q[" + q + "])")
             
@@ -137,16 +143,17 @@ def AddQuantumErrors(file):
         if (line != ''):
             keep.append(line)
     
-    with open(file + ".py", mode='wt', 
+    with open(path + file + ".py", mode='wt', 
           encoding='utf-8') as myfile:
         myfile.write('\n'.join(keep))
+    myfile.close()
 
     return None
 
-def AddGAQuantumErrors(file):
+def AddGAQuantumErrors(path, file):
     '''This function adds the probabilistic quantum errors that create the dephasing noise.'''
     # Read in the file and prepare it
-    filename = (file + ".txt")
+    filename = (path + file + ".txt")
     with open(filename) as f:
         content = f.readlines()
     lines = [x.strip('\n') for x in content]
@@ -220,20 +227,17 @@ def AddGAQuantumErrors(file):
         if (line != ''):
             keep.append(line)
     
-    with open(file + ".py", mode='wt', 
+    with open(path + "GA" + file + ".py", mode='wt', 
           encoding='utf-8') as myfile:
         myfile.write('\n'.join(keep))
+    myfile.close()
 
     return None
 
-def ErrorComposer():
-    '''Composes the python code from the QASM file containing the dephasing error.'''
-    file = QASMtoPython()
-    AddQuantumErrors(file)
-    AddGAQuantumErrors(file)
+def generatePythonCodes(device, job_id, path, filename):
+    '''Creates the python files from the QASM in specific locations'''
+    
+    getQASMCode(device, job_id, path, filename)
+    ErrorComposer(path)
     
     return None
-
-# How to run
-# getQASMCode(debice, job_id, path)
-# ErrorComposer()

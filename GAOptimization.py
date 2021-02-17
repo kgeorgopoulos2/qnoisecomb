@@ -1,11 +1,19 @@
 # Import libraries
 import numpy as np
+from numpy import pi as pi
 from PIL import Image
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 import sys, random, ast, time
 from pathlib import Path
 import re
+import pandas
+import inspect
+
+# Import GA libraries
+from deap import base, creator, tools, algorithms
+from scipy.stats import bernoulli
+from bitstring import BitArray
 
 # Import Qiskit
 from qiskit import Aer, IBMQ
@@ -16,23 +24,52 @@ from qiskit.providers.aer import QasmSimulator
 from qiskit.providers.aer.noise.errors import thermal_relaxation_error, pauli_error
 from qiskit.providers.aer.noise import NoiseModel
 from qiskit.providers.aer import noise
+from qiskit.tools.monitor import backend_monitor
 
-# Import other necessary Python files
-import simRunQW
+############ Importing QASM codes ############
 
+def qwQASM():
+    '''Runs the formatted python file from the path and returns the circuit.'''
+    
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/Formatted2qQW.py"
+        
+    return circ
 
-def singleQubitErrorRates(data):
+def noiseFreeqwQASM():
+    '''Runs the formatted, noise-free python file from the path and returns the circuit.'''
+    
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/NoiseFreeFormatted2qQW.py"
+    
+    return circ
+
+############ Getting the error rates ############
+
+def machineData(path):
+    '''Imports the error rates of the machine as the downloaded csv file. path - the path to the csv file, including
+    the name of the csv file and ".csv".'''
+    
+    colnames = ["Qubit", "Frequency", "T1", "T2", "ReadoutError", "SQError", "TQError", "Date"]
+    
+    data = pandas.read_csv(path, names=colnames)
+    
+    return data
+
+def getSingleQubitErrorRates(data):
     '''Returns as a dictionary the single qubit error rates, as they appear on ibmq_16_melbourne. NOTE: the 
     values deviate every time the machine gets callibrated.'''
     qubits = data.Qubit.tolist()
     del qubits[0]
+    qubits[0] = '0'
+    for i in range(0, len(qubits)):
+        qubits[i] = ("Q" + qubits[i])
     rates = data.SQError.tolist()
     del rates[0]
+    rates = [float(i) for i in rates]
     sqRates = dict(zip(qubits, rates))
     
     return sqRates
 
-def twoQubitErrorRates(data):
+def getTwoQubitErrorRates(data):
     '''Returns as a dictionary the two qubit error rates, as they appear on ibmq_16_melbourne. NOTE: the values 
     deviate every time the machine gets callibrated.'''
     tqer = data.TQError.tolist()
@@ -48,18 +85,22 @@ def twoQubitErrorRates(data):
             t = s[j].split(":")
             qpairs.append(t[0].replace(" ", ""))
             qvals.append(float(t[1].replace(" ", "")))
-
+    
     tqRates = dict(zip(qpairs, qvals))
     
     return tqRates
 
-def measureErrorRates(data):
+def getMeasureErrorRates(data):
     '''Returns as a dictionary the measurement error rates, as they appear on ibmq_16_melbourne. NOTE: the values
     deviate every time the machine gets callibrated'''
     qubits = data.Qubit.tolist()
     del qubits[0]
+    qubits[0] = '0'
+    for i in range(0, len(qubits)):
+        qubits[i] = ("Q" + qubits[i])
     rates = data.ReadoutError.tolist()
     del rates[0]
+    rates = [float(i) for i in rates]
     measRates = dict(zip(qubits, rates))
     
     return measRates
@@ -83,18 +124,41 @@ def getDecoherenceTimes(data):
     for i in range(0,len(T1s)):
         if (T2s[i] > 2*T1s[i]):
             c = 1
-            print("ERROR: incompatible decay rates - Qubit Q", i, ", T2 =", T2s[i], "and T1 =", T1s[i])
+            print("ERROR: incompatible decay rates - Qubit Q" + str(i) + ", T2 =", T2s[i], "and T1 =", T1s[i])
     if (c == 0):
         print(r'Checking decoherence times: all ok')
 
     return T1s,T2s
 
-def noisyGate(line):
+############ Getting gate execution times ############
+
+def getSQGateExecutionTime(gate, backend, names):
+    '''Returns the average execution time of the single-qubit type gates we are interested in.'''
+    # Single qubit gates
+    s = [0]*len(names)
+    for i in range(0,len(names)):
+        s[i] = backend.properties().gate_length(gate, [i])
+
+    return (np.mean(s)*(10**9))
+
+def getTQGateExecutionTime(gate, backend, graph):
+    '''Returns the average execution time of the two-qubit type gates in the circuit.'''
+    # Two qubit gates
+
+    t = [0]*len(graph)
+    for i in range(0,len(graph)):
+        t[i] = backend.properties().gate_length('cx', graph[i])
+
+    return (np.mean(t)*(10**9))
+
+############ Define the noisy opeartions ############
+
+def noisyGate(line, sqRates, tqRates):
     '''Simulates a bit-flip channel. With a randomely generated probability p an X gate is chosen,
     whereas with (1-p) the Identity is chosen. The probability of error is chosen according to the
     qubit selected each time.'''
-    sqRates = singleQubitErrorRates() # Dictionary containing the single qubit error rates
-    tqRates = twoQubitErrorRates() # Dictionary containing the two qubit error rates
+#     sqRates = getSingleQubitErrorRates() # Dictionary containing the single qubit error rates
+#     tqRates = getTwoQubitErrorRates() # Dictionary containing the two qubit error rates
     
     # Generate the operation according to single- or two-qubit error rates
     if (("u1" in line) or ("u2" in line) or ("u3" in line) or (".x" in line)):
@@ -116,10 +180,10 @@ def noisyGate(line):
     
     return op
 
-def noisyMeasure(line):
+def noisyMeasure(line, measRates):
     '''Simulates the noisey measurement. The probability is chosen according to the qubit being measured. The
     argument `line` is a string containing the line of code that this  '''
-    measRates = measureErrorRates() # Dictionary containing the measurement error rates per qubit
+#     measRates = getMeasureErrorRates() # Dictionary containing the measurement error rates per qubit
     
     # Find out which qubit is being measured
     s = line.split('q')
@@ -131,29 +195,115 @@ def noisyMeasure(line):
     
     return op
 
-def qwQASM(path):
-    '''Runs the formatted python file from the path and returns the circuit.'''
+############ Define the TRC ############
+
+def thermalRelaxationChannel(backend, T1s, T2s, graph, gates):
+    '''Method that returns the thermal relaxation error quantum channel.'''
     
-    %run -i path
+    graph = [[0,1], [1,2], [2,3]] # The two-qubit gates that we are interested in
+    names = [0, 1, 2, 3] # The single-qubit gates that we are interested in
+
+    # Instruction times (in nanoseconds)
+    time_u1 = 10 # virtual gate
+    time_u2 = getSQGateExecutionTime('x', backend, gates) # Average of all u2 times
+    time_u3 = getSQGateExecutionTime('x', backend, gates) # Average of all u3 times
+    time_cx = getTQGateExecutionTime('cx', backend, graph) # Average of all cx times
+    time_reset = 1000  # 1 microsecond
+    time_measure = 1000 # 1 microsecond
+
+    # QuantumError objects
+    errors_reset = [thermal_relaxation_error(t1, t2, time_reset)
+                    for t1, t2 in zip(T1s, T2s)]
+    errors_measure = [thermal_relaxation_error(t1, t2, time_measure)
+                      for t1, t2 in zip(T1s, T2s)]
+    errors_u1  = [thermal_relaxation_error(t1, t2, time_u1)
+                  for t1, t2 in zip(T1s, T2s)]
+    errors_u2  = [thermal_relaxation_error(t1, t2, time_u2)
+                  for t1, t2 in zip(T1s, T2s)]
+    errors_u3  = [thermal_relaxation_error(t1, t2, time_u3)
+                  for t1, t2 in zip(T1s, T2s)]
+    errors_cx = [[thermal_relaxation_error(t1a, t2a, time_cx).expand(
+                 thermal_relaxation_error(t1b, t2b, time_cx))
+                  for t1a, t2a in zip(T1s, T2s)]
+                   for t1b, t2b in zip(T1s, T2s)]
+
+    # Add errors to noise model
+    noise_thermal = NoiseModel()
+    for j in range(len(T1s)):
+        noise_thermal.add_quantum_error(errors_reset[j], "reset", [j])
+        noise_thermal.add_quantum_error(errors_measure[j], "measure", [j])
+        noise_thermal.add_quantum_error(errors_u1[j], "u1", [j])
+        noise_thermal.add_quantum_error(errors_u2[j], "u2", [j])
+        noise_thermal.add_quantum_error(errors_u3[j], "u3", [j])
+        for k in range(len(T1s)):
+            noise_thermal.add_quantum_error(errors_cx[j][k], "cx", [j, k])
+            
+    return noise_thermal
+
+############ Define the method that executes a QW simulation ############
+
+def qwNoiseExecute(iterations, thermal, backend, T1s, T2s, graph, gates):
+    '''This method executes the circuit. This is necessary, since the circuit has to be generated each time for the new gates to appear'''
+    counts = [{}]*iterations
+    
+    if (thermal == False):
+        for i in range(0,iterations):
+            sys.stdout.write('\r'+"Simulation count: "+str(i+1))
+            circ = qwQASM()
+            simulate = execute(circ, backend = Aer.get_backend("qasm_simulator"), shots=1).result()
+            counts[i] = simulate.get_counts()
+    else:
+        noise_thermal = thermalRelaxationChannel(backend, T1s, T2s, graph, gates)
+        for i in range(0,iterations):
+            sys.stdout.write('\r'+"Simulation count: "+str(i+1))
+            circ = qwQASM()
+            simulate = execute(circ, backend = Aer.get_backend("qasm_simulator"), basis_gates=noise_thermal.basis_gates, 
+                               noise_model=noise_thermal, shots=1).result()
+            counts[i] = simulate.get_counts()
+    
+    return counts
+
+############ Simulation ancillary methods ############
+
+def getCounts(counts, iterations):
+    '''Method that formats the results of the simulation to a dictionary.'''
+    l = [()]*len(counts)
+    # Create a list of tuples of the form [(key, value), ...]
+    for i in range(0,iterations):
+        keys = list(counts[i].keys())[0]
+        values = list(counts[i].values())[0]
+        l[i] = (keys, values)
+
+    # Make the list into a dictionary
+    dct = {}    
+    for a, b in l: 
+        dct.setdefault(a, []).append(b)
+    
+    # Sum up all the duplicating locations to get their total occurences
+    for i in dct:
+        dct[i] = sum(dct[i])
+    
+    return dct
+
+def hellingerDistance(p, q):
+    '''Calculate the Hellinger distance between two probability distributions, P and Q. P and Q aregiven as simple 
+    arrays containing the probabilities p[i] and q[i]. IMPORTANT: the probability arrays have to be ordered in the 
+    same way.'''
+    sum = 0
+    for i in range (0, len(p)):
+        sum = sum + (np.sqrt(p[i]) - np.sqrt(q[i]))**2
         
-    return circ
+    h = (1/np.sqrt(2))*np.sqrt(sum)
+        
+    return h
 
-def noiseFreeqwQASM(path):
-    '''Runs the formatted, noise-free python file from the path and returns the circuit.'''
+def getProbabilities(dct,N):
+    '''Creates list of probabilities from the given line of data.'''
+    p = list(dct.values())
+    for i in range(0,len(p)):
+        p[i] = p[i]/N
     
-    %run -i path
-    
-    return circ
-
-def machineData(path):
-    '''Imports the error rates of the machine as the downloaded csv file. path - the path to the csv file, including
-    the name of the csv file and ".csv".'''
-    
-    colnames = ["Qubit", "T1", "T2", "Frequency", "ReadoutError", "SQError", "TQError", "Date"]
-    
-    data = pandas.read_csv(path, names=colnames)
-    
-    return data
+    return p
 
 def getQState(qwalk):
     '''Method to get the quantum state before the measurement. This is in particular
@@ -241,6 +391,8 @@ def getStateVectorProbabilities(qw_circ):
 
     return probs
 
+############ Quantum computer experiments and data methods ############
+
 def runExperiments(trials, circ, iterations, device, path):
     '''Method to run the experiments on the real machine.'''
     # Create and open the file for the experiments
@@ -302,92 +454,43 @@ def getAvgData(data):
     
     return avg_dct
 
-def getSQGateExecutionTime(gate, backend):
-    '''Returns the average execution time of the single-qubit type gates we are interested in.'''
-    # Single qubit gates
-    s = [0]*15
-    for i in range(0,15):
-        s[i] = backend.properties().gate_length(gate, [i])
-
-    return (np.mean(s)*(10**9))
-
-def getTQGateExecutionTime(gate, backend):
-    '''Returns the average execution time of the two-qubit type gates in the circuit.'''
-    # Two qubit gates
-    graph = [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [7,8], [8,9], [9,10], [10,11], [11,12], [12,13], [13,14],
-            [0,14], [1,13], [2,12], [3,11], [4,10], [5,9], [6,8]]
-
-    t = [0]*len(graph)
-    for i in range(0,len(graph)):
-        t[i] = backend.properties().gate_length('cx', graph[i])
-
-    return (np.mean(t)*(10**9))
-
-def thermalRelaxationChannel(backend):
-    '''Method that returns the thermal relaxation error quantum channel.'''
-    # T1 and T2
-    T1s,T2s = getDecoherenceTimes()
-
-    # Instruction times (in nanoseconds)
-    time_u1 = 10 # virtual gate
-    time_u2 = getSQGateExecutionTime('u2', backend) # Average of all u2 times
-    time_u3 = getSQGateExecutionTime('u3', backend) # Average of all u3 times
-    time_cx = getTQGateExecutionTime('cx', backend) # Average of all cx times
-    time_reset = 1000  # 1 microsecond
-    time_measure = 1000 # 1 microsecond
-
-    # QuantumError objects
-    errors_reset = [thermal_relaxation_error(t1, t2, time_reset)
-                    for t1, t2 in zip(T1s, T2s)]
-    errors_measure = [thermal_relaxation_error(t1, t2, time_measure)
-                      for t1, t2 in zip(T1s, T2s)]
-    errors_u1  = [thermal_relaxation_error(t1, t2, time_u1)
-                  for t1, t2 in zip(T1s, T2s)]
-    errors_u2  = [thermal_relaxation_error(t1, t2, time_u2)
-                  for t1, t2 in zip(T1s, T2s)]
-    errors_u3  = [thermal_relaxation_error(t1, t2, time_u3)
-                  for t1, t2 in zip(T1s, T2s)]
-    errors_cx = [[thermal_relaxation_error(t1a, t2a, time_cx).expand(
-                 thermal_relaxation_error(t1b, t2b, time_cx))
-                  for t1a, t2a in zip(T1s, T2s)]
-                   for t1b, t2b in zip(T1s, T2s)]
-
-    # Add errors to noise model
-    noise_thermal = NoiseModel()
-    for j in range(len(T1s)):
-        noise_thermal.add_quantum_error(errors_reset[j], "reset", [j])
-        noise_thermal.add_quantum_error(errors_measure[j], "measure", [j])
-        noise_thermal.add_quantum_error(errors_u1[j], "u1", [j])
-        noise_thermal.add_quantum_error(errors_u2[j], "u2", [j])
-        noise_thermal.add_quantum_error(errors_u3[j], "u3", [j])
-        for k in range(len(T1s)):
-            noise_thermal.add_quantum_error(errors_cx[j][k], "cx", [j, k])
-            
-    return noise_thermal
-
-def qwNoiseExecute(iterations, thermal):
-    '''This method executes the circuit. This is necessary, since the circuit has to be generated each time for the new gates to appear'''
-    counts = [{}]*iterations
+############ Assist methods for GA optimization ############
+def runCreateCircuit():
+    '''Runs the formatted python file from the path and returns the circuit.'''
     
-    if (thermal == False):
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/Create2qCircuit.py"
+        
+    return None
+
+def combinedExecute(iterations, thermal, ratesList, backend, T1s, T2s, graph, gates):
+    '''This method executes the combined model. This is necessary, since the circuit has to be generated each time for the new gates to appear'''
+    counts = [{}]*iterations
+    runCreateCircuit()
+    
+    # Update the error rates with the new ones from the list
+    sqRates = {'Q0': ratesList[0], 'Q1': ratesList[1], 'Q2': ratesList[2], 'Q3': ratesList[3]}
+    tqRates = {'Q0_1': ratesList[4], 'Q1_0': ratesList[4], 'Q1_2': ratesList[5], 'Q2_1': ratesList[5], 'Q2_3': ratesList[6], 'Q3_2': ratesList[6]}
+    measRates = {'Q1': ratesList[7], 'Q3': ratesList[8]}
+    
+    # Execute the simulation
+    if (thermal == True):
+        noise_thermal = thermalRelaxationChannel(backend, T1s, T2s, graph, gates)
         for i in range(0,iterations):
-            sys.stdout.write('\r'+"Simulation count: "+str(i+1))
-            circ = qwQASM()
+            circ = createCircuit(sqRates, tqRates, measRates)
+            simulate = execute(circ, backend = Aer.get_backend("qasm_simulator"), basis_gates=noise_thermal.basis_gates, 
+                               noise_model=noise_thermal, shots=1).result()
             simulate = execute(circ, backend = Aer.get_backend("qasm_simulator"), shots=1).result()
             counts[i] = simulate.get_counts()
     else:
-        noise_thermal = thermalRelaxationChannel()
         for i in range(0,iterations):
-            sys.stdout.write('\r'+"Simulation count: "+str(i+1))
-            circ = qwQASM()
-            simulate = execute(circ, backend = Aer.get_backend("qasm_simulator"), basis_gates=noise_thermal.basis_gates, 
-                               noise_model=noise_thermal, shots=1).result()
+            circ = createCircuit(sqRates, tqRates, measRates)
+            simulate = execute(circ, backend = Aer.get_backend("qasm_simulator"), shots=1).result()
             counts[i] = simulate.get_counts()
     
     return counts
 
-def getCounts(counts, iterations):
-    '''Method that formats the results of the simulation to a dictionary.'''
+def getCombinedCounts(counts, iterations):
+    '''Method that formats the results of the simulation for the combined model to a dictionary.'''
     l = [()]*len(counts)
     # Create a list of tuples of the form [(key, value), ...]
     for i in range(0,iterations):
@@ -406,75 +509,94 @@ def getCounts(counts, iterations):
     
     return dct
 
-def hellingerDistance(p, q):
-    '''Calculate the Hellinger distance between two probability distributions, P and Q. P and Q aregiven as simple 
-    arrays containing the probabilities p[i] and q[i]. IMPORTANT: the probability arrays have to be ordered in the 
-    same way.'''
-    sum = 0
-    for i in range (0, len(p)):
-        sum = sum + (np.sqrt(p[i]) - np.sqrt(q[i]))**2
+def noisyGAGate(line, sqRates, tqRates):
+    '''Simulates a bit-flip channel. With a randomely generated probability p an X gate is chosen,
+    whereas with (1-p) the Identity is chosen. The probability of error is chosen according to the
+    qubit selected each time.'''
+    # Generate the operation according to single- or two-qubit error rates
+    if (("u1" in line) or ("u2" in line) or ("u3" in line) or (".x" in line)):
+        s = line.split('[')
+        s = s[1].split(']')
+        qubit = ("Q" + s[0])
+        op = list(np.random.choice(["X", "I"], 1, p=[sqRates[qubit], 1-sqRates[qubit]]))
+    elif (".cx" in line):
+        s = line.split('(')
+        s = s[1].split(',')
+        s0 = s[0].split('[')
+        s0 = s0[1].split(']')
+        q1 = s0[0]
+        s0 = s[1].split('[')
+        s0 = s0[1].split(']')
+        q2 = s0[0]
+        qubits = ("Q" + q1 + "_" + q2)
+        op = list(np.random.choice(["X", "I"], 1, p=[tqRates[qubits], 1-tqRates[qubits]]))
+    
+    return op
+
+def noisyGAMeasure(line, measRates):
+    '''Simulates the noisey measurement. The probability is chosen according to the qubit being measured. The
+    argument `line` is a string containing the line of code that this  '''    
+    # Find out which qubit is being measured
+    s = line.split('q')
+    s = s[1].split('[')
+    s = s[1].split(']')
+    qubit = ("Q" + s[0])
+    
+    op = list(np.random.choice(["X", "I"], 1, p=[measRates[qubit], 1-measRates[qubit]]))
+    
+    return op
+
+############ Importing GA QASM codes ############
+
+def qwGAQASM():
+    '''Runs the formatted python file from the path and returns the circuit.'''
+    
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/GAFormatted2qQW.py"
         
-    h = (1/np.sqrt(2))*np.sqrt(sum)
-        
-    return h
+    return circ
 
-def getProbabilities(dct,N):
-    '''Creates list of probabilities from the given line of data.'''
-    p = list(dct.values())
-    for i in range(0,len(p)):
-        p[i] = p[i]/N
-    
-    return p
+############ GA preparation methods ############
 
-######## Genetic Algorithm Methods ########
-
-def initChrom(chromosome):
-    '''Function used to return the chromosome that will be used to initialize the population.'''
-    chromosome = [int(chromosome[i:i+1], 2) for i in range(0, len(chromosome))]
-    
-    return chromosome
-
-def fixSameSupport(dct_ex, dct_si):
-    '''Forces two dictionaries to have the same support.'''
-    # First we import the entries of the experiments that dont appear in the simulations in the simulations
-    # dictionary. Each entry will have probability 0
-    for keys_ex in dct_ex.keys():
-        if keys_ex not in dct_si:
-            dct_si.update({keys_ex: 0})
-
-    # Second, we import the entries of the simulations that don't appear in the experimental data dictionary.
-    # Each entry will have probability 0
-    for keys_si in dct_si.keys():
-        if keys_si not in dct_ex:
-            dct_ex.update({keys_si: 0})
-
-    dct_ex = dict(OrderedDict(sorted(dct_ex.items())))
-    dct_si = dict(OrderedDict(sorted(dct_si.items())))
-    
-    return dct_ex,dct_si
-
-def getSubsystemRates(q, num_q, s_q):
+def getSubsystemRates(q, num_q, s_q, m_q, data):
     '''Gets the relevant error rates for the system we want. q is a list of tuples of the qubits in the system that two-qubit
     gates act on. s_q is the list of qubits of the real machine that participate (i.e Q1, Q0, Q3, etc etc)'''
-    sqRates = singleQubitErrorRates() # Single-qubit error rates
-    tqRates = twoQubitErrorRates() # Two-qubit error rates
-    measRates = measureErrorRates() # Measurement error rates
+    sqRates = getSingleQubitErrorRates(data) # Single-qubit error rates
+    tqRates = getTwoQubitErrorRates(data) # Two-qubit error rates
+    measRates = getMeasureErrorRates(data) # Measurement error rates
     sqRatesSub = [0]*(num_q)
-    tqRatesSub = [0]*len(q)
-    measRatesSub = [0]*(num_q)
+    tqRatesSub = [0]*(len(q))
+    measRatesSub = [0]*len(m_q)
+    qs = [""]*(num_q)
+    qp = [""]*(len(q))
+    qm = [""]*len(m_q)
     
-    # Prepare the single-qubit rates and the measure rates
+    # Prepare the single-qubit rates
     for i in range(0, num_q):
         s = ("Q" + str(s_q[i]))
+        qs[i] = s
         sqRatesSub[i] = sqRates[s]
+        
+    # Prepare the measure rates
+    for i in range(0, len(m_q)):
+        s = ("Q" + str(m_q[i]))
+        qm[i] = s
         measRatesSub[i] = measRates[s]
     
-    # Prepare the two-qubit rates
+    # Prepare the two-qubit rates for both directions of the qubit pairs
     for i in range(0, len(q)):
         s = ("Q" + str(q[i][0]) + "_" + str(q[i][1]))
+        qp[i] = s
         tqRatesSub[i] = tqRates[s]
+#     for i in range(0, len(q)):
+#         s = ("Q" + str(q[i][1]) + "_" + str(q[i][0]))
+#         qp[i+len(q)] = s
+#         tqRatesSub[i+len(q)] = tqRates[s]
     
-    return sqRatesSub,tqRatesSub,measRatesSub
+    sqRatesSubDct = dict(zip(qs, sqRatesSub))
+    tqRatesSubDct = dict(zip(qp, tqRatesSub))
+    measRatesSubDct = dict(zip(qm, measRatesSub))
+    
+    return sqRatesSubDct,tqRatesSubDct,measRatesSubDct
 
 def paramEncoding(scalar, *param):
     '''Encode the parameters to bit-strings. Note: we know all the param arguments are lists. nor is the value
@@ -519,6 +641,12 @@ def paramEncoding(scalar, *param):
     
     return chromosome
 
+def initChrom(chromosome):
+    '''Function used to return the chromosome that will be used to initialize the population.'''
+    chromosome = [int(chromosome[i:i+1], 2) for i in range(0, len(chromosome))]
+    
+    return chromosome
+
 def decode(solution, scalar, num_rates, num_q):
     '''Decodes a solution/chromosome to its component error rates.'''
     decoded_bits = [None]*num_rates
@@ -542,6 +670,27 @@ def decode(solution, scalar, num_rates, num_q):
     
     return decoded_rates
 
+def fixSameSupport(dct_ex, dct_si):
+    '''Forces two dictionaries to have the same support.'''
+    # First we import the entries of the experiments that dont appear in the simulations in the simulations
+    # dictionary. Each entry will have probability 0
+    for keys_ex in dct_ex.keys():
+        if keys_ex not in dct_si:
+            dct_si.update({keys_ex: 0})
+
+    # Second, we import the entries of the simulations that don't appear in the experimental data dictionary.
+    # Each entry will have probability 0
+    for keys_si in dct_si.keys():
+        if keys_si not in dct_ex:
+            dct_ex.update({keys_si: 0})
+
+    dct_ex = dict(OrderedDict(sorted(dct_ex.items())))
+    dct_si = dict(OrderedDict(sorted(dct_si.items())))
+    
+    return dct_ex,dct_si
+
+############ GA running methods ############
+
 def hd_evaluate(solution):
     '''Function that evaluates the fitness of the new generation using Hellinger distance as the fitness function.
     Arguments: scalar (int) - the scalar used to make the error rates to integers, solution (str) - the solution resukting from
@@ -550,19 +699,25 @@ def hd_evaluate(solution):
     fitness (float) - the fitness value, i.e theHellinger distance, that we want to minimize'''
     fitness = 0.0
     scalar = 1000000
-    num_rates = 8
-    num_q = 3
-    avgExData = {'00': 158.5, '01': 316.8, '10': 135.1, '11': 389.6}
-    thermal = False
+    num_rates = 9
+    num_q = 4
+    avgExData = {'00': 138.5, '01': 356.8, '10': 115.1, '11': 389.6}
+#     {'00': 125, '01': 375, '10': 86, '11': 414}
+    thermal = True
+    graph = [[0,1], [1,2], [2,3]] # The two-qubit gates that we are interested in
+    gates = [0, 1, 2, 3] # The single-qubit gates that we are interested in
+    device = provider.get_backend('ibmq_16_melbourne')
+    T1s,T2s = getDecoherenceTimes(data)
         
     # Decode genetic algorithm solution to error rates
     ratesList = decode(solution, scalar, num_rates, num_q)
     
     # Run simulation with the rates
     iterations = 1000 # Probably always fixed on 1,000
-    counts = simRunQW.combinedExecute(iterations, thermal, num_q, ratesList)
-    counts = simRunQW.getCombinedCounts(counts, iterations)
+    counts = combinedExecute(iterations, thermal, ratesList, device, T1s, T2s, graph, gates)
+    counts = getCombinedCounts(counts, iterations)
     counts = dict(OrderedDict(sorted(counts.items())))
+#     print(counts)
     
     # Format the returned distributions in a way that we can calculate the Hellinger Distance
     p,q = fixSameSupport(avgExData, counts)
@@ -583,13 +738,13 @@ def getBest(population, scalar, num_rates, num_q):
         # Decode genetic algorithm solution to error rates
         best_rates = decode(bi, scalar, num_rates, num_q)
         
-    return bestRates
+    return best_rates
 
 def getIndividuals(creator, initChrom, n, chromosome):
     ''''''
     scalar = 1000000
-    num_rates = 8
-    num_q = 3
+    num_rates = 9
+    num_q = 4
     individuals = []
     
     # Hardcode the IBMQ rates
@@ -601,15 +756,16 @@ def getIndividuals(creator, initChrom, n, chromosome):
     # Randomize the remaining rates
     for i in range(0, n-1):
         decodedRates = decode(initChrom(chromosome), scalar, num_rates, num_q)
-        rc0 = format(abs(int((decodedRates[0] + np.random.normal(0, 0.0005, 1))*scalar)), b)
-        rc1 = format(abs(int((decodedRates[1] + np.random.normal(0, 0.0005, 1))*scalar)), b)
-        rc2 = format(abs(int((decodedRates[2] + np.random.normal(0, 0.0005, 1))*scalar)), b)
-        rc3 = format(abs(int((decodedRates[3] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc0 = format(abs(int((decodedRates[0] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc1 = format(abs(int((decodedRates[1] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc2 = format(abs(int((decodedRates[2] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc3 = format(abs(int((decodedRates[3] + np.random.normal(0, 0.0002, 1))*scalar)), b)
         rc4 = format(abs(int((decodedRates[4] + np.random.normal(0, 0.005, 1))*scalar)), b)
         rc5 = format(abs(int((decodedRates[5] + np.random.normal(0, 0.005, 1))*scalar)), b)
         rc6 = format(abs(int((decodedRates[6] + np.random.normal(0, 0.005, 1))*scalar)), b)
         rc7 = format(abs(int((decodedRates[7] + np.random.normal(0, 0.005, 1))*scalar)), b)
-        randchrom = rc0 + rc1 + rc2 + rc3 + rc4 + rc5 + rc6 + rc7
+        rc8 = format(abs(int((decodedRates[8] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        randchrom = rc0 + rc1 + rc2 + rc3 + rc4 + rc5 + rc6 + rc7 + rc8
         individual = initChrom(randchrom)
         individual = creator(individual)
         individuals.append(individual)
@@ -641,7 +797,7 @@ def runGA(population_size, num_generations, gene_length, scalar, chromosome, num
     
     # Run the Genetic Algorithm
     start_time = time.time()
-    r = algorithms.eaSimple(population, toolbox, cxpb = 0.5, mutpb = 0.2, ngen = num_generations, verbose = False)
+    r = algorithms.eaSimple(population, toolbox, cxpb = 0.7, mutpb = 0.1, ngen = num_generations, verbose = False)
     end_time = time.time()
     print("\nTime elapsed:", end_time - start_time, "seconds.")
     
@@ -650,8 +806,7 @@ def runGA(population_size, num_generations, gene_length, scalar, chromosome, num
     
     return bestRates
 
-######## Run the Parameter Optimization ########
-
+############ Run the parameter optimization ############
 
 def optimise():
     '''Method used to optimise the error rate parameters. All the results are shown while the method
@@ -662,27 +817,24 @@ def optimise():
     backend = Aer.get_backend("qasm_simulator") # The simulator
     iterations = 1000 # Iterations should remain constant to ensure consistency
 
-    # Get the probabilities of the states from the state vector
-    start_time = time.time()
-    ideal_circ = noiseFreeqwQASM() # The measurements have to be commented out
-    end_time = time.time()
-    print("\nTime elapsed:", end_time - start_time, "seconds.")
-    p_ideal = getStateVectorProbabilities(ideal_circ)
-    p_ideal = dict(OrderedDict(sorted(p_ideal.items())))
-    print("Ideal probability distribution:", p_ideal)
-
-    # Run experiments on the quantum computer and import the data
-    qw_circ = noiseFreeqwQASM()
-    trials = 10
-    runExperiments(trials, qw_circ, iterations, device, path)
-    exData = getData(path, False)
-    print("Quantum computer data:", exData)
-    avgExData = getAvgData(exData)
-    print("\nAverage counts on quantum computer trials:", avgExData)
-
     # Run the combined quantum noise simulator and get the distribution pre-optimization
+    # Getting the noise data
+    path_data = "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/Data/ibmq_16_melbourne_calibrations.csv" # Import the path where the noise data are stored
+    data = machineData(path_data)
+    graph = [[0,1], [1,2], [2,3]] # The two-qubit gates that we are interested in
+    gates = [0, 1, 2, 3] # The single-qubit gates that we are interested in
+
+    sqRates = getSingleQubitErrorRates(data) # Dictionary containing the single qubit error rates
+    tqRates = getTwoQubitErrorRates(data) # Dictionary containing the two qubit error rates
+    measRates = getMeasureErrorRates(data) # Dictionary containing the measurement error rates per qubit
+    T1s,T2s = getDecoherenceTimes(data)
+
+    circ = qwQASM()
+    nfcirc = noiseFreeqwQASM()
+
+    # Run simulations with the UNM
     start_time = time.time()
-    counts_comb = qwNoiseExecute(iterations, thermal = True)
+    counts_comb = qwNoiseExecute(iterations, thermal = True, backend = device, T1s = T1s, T2s = T2s, graph = graph, gates = gates)
     end_time = time.time()
     print("\nTime elapsed:", end_time - start_time, "seconds.")
     counts_comb = getCounts(counts_comb, iterations)
@@ -690,43 +842,72 @@ def optimise():
     print("\nCounts on noisy quantum simulator:", counts_comb)
 
     # Calculate the HD pre-optimization
-    h_pre = hellingerDistance(getProbabilities(avgExData, iterations), getProbabilities(counts_comb, iterations))
-    print("Hellinger Distance pre-optimization:", h_pre)
+    avgExData = {'00': 138.5, '01': 356.8, '10': 115.1, '11': 389.6} # The averaged distribution from the Quantum Computer
+    
+    # Get the probabilities of the **ordered** dictionaries
+    p = getProbabilities(counts_comb, iterations)
+    q = getProbabilities(avgExData, iterations)
 
-    # Prepare for the GA optimization
-    q_pairs = [(0,1), (1,2)] # List of qubit pairs in ibmq_16_melbourne
-    s_q = [0, 1, 2] # The qubits themselves
+    # Calculate the HD
+    h_pre = hellingerDistance(p,q)
+    print("The HD between the UNM and the Quantum Computer for", iterations, "iterations is:", h_pre)
+
+   # Prepare for the GA optimization
+    q_pairs = [(0,1), (1,2), (2,3)] # List of qubit pairs in ibmq_16_melbourne
+    s_q = [0, 1, 2, 3] # The qubits themselves
+    m_q = [1, 3] # The qubits being measured
     num_q = len(s_q) # Number of qubits in the system
-    num_rates = 8 # Number of parameters for optimization
+    num_rates = 9 # Number of parameters for optimization
     scalar = 1000000 # Scalar used to eliminate floating point in the encoded parameters binary representation
-    thermal = False # Decide whether we want the thermal relaxation channel or not. Note: if yes, the evaluation takes longer
+    thermal = True # Decide whether we want the thermal relaxation channel or not.
 
-    # Get the error rates relevant to our system
-    sqRates,tqRates,measRates = getSubsystemRates(q_pairs, num_q, s_q)
+    # Get the error rates relevant to our system as dictionaries and lists
+    sqRatesDct,tqRatesDct,measRatesDct = getSubsystemRates(q_pairs, num_q, s_q, m_q, data)
+
+    print("Single-qubit rates with qubit information:", sqRatesDct)
+    print("Two-qubit rates with qubit information::", tqRatesDct)
+    print("Measurement rates with qubit information::", measRatesDct, "\n")
+
+    sqRates = list(sqRatesDct.values())
+    tqRates = list(tqRatesDct.values()) # Use set to remove duplicates
+    measRates = list(measRatesDct.values())
+    print("Single-qubit rates:", sqRates)
+    print("Two-qubit rates:", tqRates)
+    print("Measurement rates:", measRates, "\n")
 
     # Encode the parameters to get the chromosome bit-string
     chromosome = paramEncoding(scalar, sqRates, tqRates, measRates)
-    init_chrom = decode(initChrom(chromosome), scalar, 8, num_q)
+    init_chrom = decode(initChrom(chromosome), scalar, 9, num_q)
     print("Initial chromosome:", init_chrom, end = '\n')
+    print("\n")
 
     # Evaluate the initial Hellinger distance
     init_fitness = hd_evaluate(initChrom(chromosome))
-
-    # Run the GA Optimization
+    
+    # Run the Genetic Algorithm Optimization
     population_size = 4 # The number of solutions generated every time
-    num_generations = 10 # The number of generations, i.e how many times the populations will reproduce
+    num_generations = 2 # The number of generations, i.e how many times the populations will reproduce
     gene_length = len(chromosome)
+
     bestRates = runGA(population_size, num_generations, gene_length, scalar, chromosome, num_rates, num_q)
     print("The optimized error rates are:", bestRates)
-
-    # Run simulation with the best error rates resulting from the GA
-    post_counts = combinedExecute(iterations, True, num_q, bestRates)
-    post_counts = simRunQW.getCombinedCounts(post_counts, iterations)
+    
+    # Calculate the post-optimization HD
+    # Run simulations with the UNM
+    start_time = time.time()
+    post_counts = combinedExecute(iterations, thermal = True, ratesList = bestRates, backend = device, T1s = T1s, T2s = T2s, graph = graph, gates = gates)
+    end_time = time.time()
+    print("\nTime elapsed:", end_time - start_time, "seconds.")
+    post_counts = getCounts(post_counts, iterations)
     post_counts = dict(OrderedDict(sorted(post_counts.items())))
-    print(post_counts)
+    print("\nCounts on noisy quantum simulator:", post_counts)
 
-    # Find the HD post-optimization
-    h_post = hellingerDistance(getProbabilities(avgExData, iterations), getProbabilities(post_counts, iterations))
-    print("Hellinger distance post-optimization:", h_post)
+    # Get the probabilities of the **ordered** dictionaries
+    p = getProbabilities(post_counts, iterations)
+    q = getProbabilities(avgExData, iterations)
+
+    # Calculate the HD
+    h_post = hellingerDistance(p,q)
+    print("The HD between the UNM and the Quantum Computer post-optimization for", iterations, "iterations is:", h_post)
     
     return None

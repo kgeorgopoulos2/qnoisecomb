@@ -1,0 +1,1 @@
+1. We need to fix the methods in the GA so that they can create autonomously the code like in the decode according to the number of variables that participate in each field of the error rates.
