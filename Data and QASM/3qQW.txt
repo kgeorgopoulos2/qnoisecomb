@@ -1,7 +1,6 @@
-OPENQASM 2.0;
-include "qelib1.inc";
-qreg q[15];
-creg c[3];
+q = QuantumRegister(6, 'q')
+c = ClassicalRegister(3, 'c')
+circ = QuantumCircuit(q, c)
 u2(0.0,3.141592653589793) q[5];
 barrier q[0],q[1],q[4],q[5],q[2],q[3];
 cx q[1],q[2];
