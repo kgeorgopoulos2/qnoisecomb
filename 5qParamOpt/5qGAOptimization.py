@@ -31,14 +31,14 @@ from qiskit.tools.monitor import backend_monitor
 def qwQASM():
     '''Runs the formatted python file from the path and returns the circuit.'''
     
-    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/Formatted2qQW.py"
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/Formatted4qQW.py"
         
     return circ
 
 def noiseFreeqwQASM():
     '''Runs the formatted, noise-free python file from the path and returns the circuit.'''
     
-    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/NoiseFreeFormatted2qQW.py"
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/NoiseFreeFormatted4qQW.py"
     
     return circ
 
@@ -199,9 +199,6 @@ def noisyMeasure(line, measRates):
 
 def thermalRelaxationChannel(backend, T1s, T2s, graph, gates):
     '''Method that returns the thermal relaxation error quantum channel.'''
-    
-    graph = [[0,1], [1,2], [2,3]] # The two-qubit gates that we are interested in
-    names = [0, 1, 2, 3] # The single-qubit gates that we are interested in
 
     # Instruction times (in nanoseconds)
     time_u1 = 10 # virtual gate
@@ -326,7 +323,7 @@ def getQState(qwalk):
     # Create the dictionary without all the    
     qstate = {}
     for i in range(0,len(dct)):
-        qstate[format(i, '#05b')[2:]] = dct[i]
+        qstate[format(i, '#08b')[2:]] = dct[i]
                         
     return qstate
 
@@ -458,7 +455,7 @@ def getAvgData(data):
 def runCreateCircuit():
     '''Runs the formatted python file from the path and returns the circuit.'''
     
-    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/Create2qCircuit.py"
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/Create4qCircuit.py"
         
     return None
 
@@ -468,9 +465,9 @@ def combinedExecute(iterations, thermal, ratesList, backend, T1s, T2s, graph, ga
     runCreateCircuit()
     
     # Update the error rates with the new ones from the list
-    sqRates = {'Q0': ratesList[0], 'Q1': ratesList[1], 'Q2': ratesList[2], 'Q3': ratesList[3]}
-    tqRates = {'Q0_1': ratesList[4], 'Q1_0': ratesList[4], 'Q1_2': ratesList[5], 'Q2_1': ratesList[5], 'Q2_3': ratesList[6], 'Q3_2': ratesList[6]}
-    measRates = {'Q1': ratesList[7], 'Q3': ratesList[8]}
+    sqRates = {'Q0': ratesList[0], 'Q1': ratesList[1], 'Q2': ratesList[2], 'Q3': ratesList[3], 'Q4': ratesList[4], 'Q5': ratesList[5], 'Q6': ratesList[6], 'Q7': ratesList[7], 'Q8': ratesList[8], 'Q9': ratesList[9], 'Q10': ratesList[10]}
+    tqRates = {'Q0_1': ratesList[11], 'Q1_0': ratesList[11], 'Q1_2': ratesList[12], 'Q2_1': ratesList[12], 'Q2_3': ratesList[13], 'Q3_2': ratesList[13], 'Q3_4': ratesList[14], 'Q4_3': ratesList[14], 'Q4_5': ratesList[15], 'Q5_4': ratesList[15], 'Q5_6': ratesList[16], 'Q6_5': ratesList[16], 'Q4_10': ratesList[17], 'Q10_4': ratesList[17], 'Q5_9': ratesList[18], 'Q9_5': ratesList[18], 'Q6_8': ratesList[19], 'Q8_6': ratesList[19], 'Q7_8': ratesList[20], 'Q8_7': ratesList[20]}
+    measRates = {'Q4': ratesList[21], 'Q1': ratesList[22], 'Q3': ratesList[23], 'Q8': ratesList[24]}
     
     # Execute the simulation
     if (thermal == True):
@@ -551,7 +548,7 @@ def noisyGAMeasure(line, measRates):
 def qwGAQASM():
     '''Runs the formatted python file from the path and returns the circuit.'''
     
-    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/GAFormatted2qQW.py"
+    %run -i "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/QASM Codes/GAFormatted4qQW.py"
         
     return circ
 
@@ -587,10 +584,6 @@ def getSubsystemRates(q, num_q, s_q, m_q, data):
         s = ("Q" + str(q[i][0]) + "_" + str(q[i][1]))
         qp[i] = s
         tqRatesSub[i] = tqRates[s]
-#     for i in range(0, len(q)):
-#         s = ("Q" + str(q[i][1]) + "_" + str(q[i][0]))
-#         qp[i+len(q)] = s
-#         tqRatesSub[i+len(q)] = tqRates[s]
     
     sqRatesSubDct = dict(zip(qs, sqRatesSub))
     tqRatesSubDct = dict(zip(qp, tqRatesSub))
@@ -699,13 +692,12 @@ def hd_evaluate(solution):
     fitness (float) - the fitness value, i.e theHellinger distance, that we want to minimize'''
     fitness = 0.0
     scalar = 1000000
-    num_rates = 9
-    num_q = 4
-    avgExData = {'00': 138.5, '01': 356.8, '10': 115.1, '11': 389.6}
-#     {'00': 125, '01': 375, '10': 86, '11': 414}
+    num_rates = 25
+    num_q = 11
+    avgExData = {'000': 254.4, '001': 130.0, '010': 81.6, '011': 139.1, '100': 91.6, '101': 83.5, '110': 86.1, '111': 133.7}
     thermal = True
-    graph = [[0,1], [1,2], [2,3]] # The two-qubit gates that we are interested in
-    gates = [0, 1, 2, 3] # The single-qubit gates that we are interested in
+    graph = [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [4,10], [5,9], [6,8], [8,7]] # The two-qubit gates that we are interested in
+    gates = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] # The single-qubit gates that we are interested in
     device = provider.get_backend('ibmq_16_melbourne')
     T1s,T2s = getDecoherenceTimes(data)
         
@@ -717,7 +709,6 @@ def hd_evaluate(solution):
     counts = combinedExecute(iterations, thermal, ratesList, device, T1s, T2s, graph, gates)
     counts = getCombinedCounts(counts, iterations)
     counts = dict(OrderedDict(sorted(counts.items())))
-#     print(counts)
     
     # Format the returned distributions in a way that we can calculate the Hellinger Distance
     p,q = fixSameSupport(avgExData, counts)
@@ -743,8 +734,8 @@ def getBest(population, scalar, num_rates, num_q):
 def getIndividuals(creator, initChrom, n, chromosome):
     ''''''
     scalar = 1000000
-    num_rates = 9
-    num_q = 4
+    num_rates = 25
+    num_q = 6
     individuals = []
     
     # Hardcode the IBMQ rates
@@ -760,12 +751,28 @@ def getIndividuals(creator, initChrom, n, chromosome):
         rc1 = format(abs(int((decodedRates[1] + np.random.normal(0, 0.0002, 1))*scalar)), b)
         rc2 = format(abs(int((decodedRates[2] + np.random.normal(0, 0.0002, 1))*scalar)), b)
         rc3 = format(abs(int((decodedRates[3] + np.random.normal(0, 0.0002, 1))*scalar)), b)
-        rc4 = format(abs(int((decodedRates[4] + np.random.normal(0, 0.005, 1))*scalar)), b)
-        rc5 = format(abs(int((decodedRates[5] + np.random.normal(0, 0.005, 1))*scalar)), b)
-        rc6 = format(abs(int((decodedRates[6] + np.random.normal(0, 0.005, 1))*scalar)), b)
-        rc7 = format(abs(int((decodedRates[7] + np.random.normal(0, 0.005, 1))*scalar)), b)
-        rc8 = format(abs(int((decodedRates[8] + np.random.normal(0, 0.005, 1))*scalar)), b)
-        randchrom = rc0 + rc1 + rc2 + rc3 + rc4 + rc5 + rc6 + rc7 + rc8
+        rc4 = format(abs(int((decodedRates[4] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc5 = format(abs(int((decodedRates[5] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc6 = format(abs(int((decodedRates[6] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc7 = format(abs(int((decodedRates[7] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc8 = format(abs(int((decodedRates[8] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc9 = format(abs(int((decodedRates[9] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc10 = format(abs(int((decodedRates[10] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc11 = format(abs(int((decodedRates[11] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc12 = format(abs(int((decodedRates[12] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc13 = format(abs(int((decodedRates[13] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc14 = format(abs(int((decodedRates[14] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc15 = format(abs(int((decodedRates[15] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc16 = format(abs(int((decodedRates[16] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc17 = format(abs(int((decodedRates[17] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc18 = format(abs(int((decodedRates[18] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc19 = format(abs(int((decodedRates[19] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc20 = format(abs(int((decodedRates[20] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc21 = format(abs(int((decodedRates[21] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc22 = format(abs(int((decodedRates[22] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc23 = format(abs(int((decodedRates[23] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        rc24 = format(abs(int((decodedRates[24] + np.random.normal(0, 0.005, 1))*scalar)), b)
+        randchrom = rc0 + rc1 + rc2 + rc3 + rc4 + rc5 + rc6 + rc7 + rc8 + rc9 + rc10 + rc11 + rc12 + rc13 + rc14 + rc15 + rc16 + rc17 + rc18 + rc19 + rc20 + rc21 + rc22 + rc23 + rc24
         individual = initChrom(randchrom)
         individual = creator(individual)
         individuals.append(individual)
@@ -821,8 +828,8 @@ def optimise():
     # Getting the noise data
     path_data = "/Users/b6035076/Qiskit/qiskit-tutorials-master/PhD Research/Unified Noise Model/Data/ibmq_16_melbourne_calibrations.csv" # Import the path where the noise data are stored
     data = machineData(path_data)
-    graph = [[0,1], [1,2], [2,3]] # The two-qubit gates that we are interested in
-    gates = [0, 1, 2, 3] # The single-qubit gates that we are interested in
+    graph = [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [4,10], [5,9], [6,8], [8,7]] # The two-qubit gates that we are interested in
+    gates = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] # The single-qubit gates that we are interested in
 
     sqRates = getSingleQubitErrorRates(data) # Dictionary containing the single qubit error rates
     tqRates = getTwoQubitErrorRates(data) # Dictionary containing the two qubit error rates
@@ -842,7 +849,7 @@ def optimise():
     print("\nCounts on noisy quantum simulator:", counts_comb)
 
     # Calculate the HD pre-optimization
-    avgExData = {'00': 138.5, '01': 356.8, '10': 115.1, '11': 389.6} # The averaged distribution from the Quantum Computer
+    avgExData = {'000': 254.4, '001': 130.0, '010': 81.6, '011': 139.1, '100': 91.6, '101': 83.5, '110': 86.1, '111': 133.7} # The averaged distribution from the Quantum Computer
     
     # Get the probabilities of the **ordered** dictionaries
     p = getProbabilities(counts_comb, iterations)
@@ -853,11 +860,11 @@ def optimise():
     print("The HD between the UNM and the Quantum Computer for", iterations, "iterations is:", h_pre)
 
    # Prepare for the GA optimization
-    q_pairs = [(0,1), (1,2), (2,3)] # List of qubit pairs in ibmq_16_melbourne
-    s_q = [0, 1, 2, 3] # The qubits themselves
-    m_q = [1, 3] # The qubits being measured
+    q_pairs = [(0,1), (1,2), (2,3), (3,4), (4,5)] # List of qubit pairs in ibmq_16_melbourne
+    s_q = [0, 1, 2, 3, 4, 5] # The qubits themselves
+    m_q = [1, 2, 0] # The qubits being measured
     num_q = len(s_q) # Number of qubits in the system
-    num_rates = 9 # Number of parameters for optimization
+    num_rates = 25 # Number of parameters for optimization
     scalar = 1000000 # Scalar used to eliminate floating point in the encoded parameters binary representation
     thermal = True # Decide whether we want the thermal relaxation channel or not.
 
@@ -877,7 +884,7 @@ def optimise():
 
     # Encode the parameters to get the chromosome bit-string
     chromosome = paramEncoding(scalar, sqRates, tqRates, measRates)
-    init_chrom = decode(initChrom(chromosome), scalar, 9, num_q)
+    init_chrom = decode(initChrom(chromosome), scalar, 14, num_q)
     print("Initial chromosome:", init_chrom, end = '\n')
     print("\n")
 

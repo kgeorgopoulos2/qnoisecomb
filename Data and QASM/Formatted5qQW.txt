@@ -1,4 +1,4 @@
-q = QuantumRegister(12, 'q')
+q = QuantumRegister(14, 'q')
 c = ClassicalRegister(5, 'c')
 circ = QuantumCircuit(q, c)
 circ.u2(0,pi, q[9])
