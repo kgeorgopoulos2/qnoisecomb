@@ -694,7 +694,7 @@ def hd_evaluate(solution):
     scalar = 1000000
     num_rates = 25
     num_q = 11
-    avgExData = {'000': 254.4, '001': 130.0, '010': 81.6, '011': 139.1, '100': 91.6, '101': 83.5, '110': 86.1, '111': 133.7}
+    avgExData = {'0000': 232, '0001': 111, '0010': 101, '0011': 54, '0100': 102, '0101': 62, '0110': 78, '0111': 48, '1000': 24, '1001': 19, '1010': 33, '1011': 32, '1100': 25, '1101': 27, '1110': 24, '1111': 28}
     thermal = True
     graph = [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [4,10], [5,9], [6,8], [8,7]] # The two-qubit gates that we are interested in
     gates = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] # The single-qubit gates that we are interested in
@@ -849,7 +849,7 @@ def optimise():
     print("\nCounts on noisy quantum simulator:", counts_comb)
 
     # Calculate the HD pre-optimization
-    avgExData = {'000': 254.4, '001': 130.0, '010': 81.6, '011': 139.1, '100': 91.6, '101': 83.5, '110': 86.1, '111': 133.7} # The averaged distribution from the Quantum Computer
+    avgExData = {'0000': 232, '0001': 111, '0010': 101, '0011': 54, '0100': 102, '0101': 62, '0110': 78, '0111': 48, '1000': 24, '1001': 19, '1010': 33, '1011': 32, '1100': 25, '1101': 27, '1110': 24, '1111': 28} # The averaged distribution from the Quantum Computer
     
     # Get the probabilities of the **ordered** dictionaries
     p = getProbabilities(counts_comb, iterations)

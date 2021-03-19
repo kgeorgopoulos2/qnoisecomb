@@ -15,7 +15,7 @@ from qiskit.providers.aer import noise
 
 def createCircuit(sqRates, tqRates, measRates):
     ''''''
-    q = QuantumRegister(14, 'q')
+    q = QuantumRegister(13, 'q')
     c = ClassicalRegister(5, 'c')
     circ = QuantumCircuit(q, c)
     circ.u2(0,pi, q[9])
