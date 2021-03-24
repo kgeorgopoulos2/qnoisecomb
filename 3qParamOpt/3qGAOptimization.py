@@ -881,7 +881,7 @@ def optimise():
     init_fitness = hd_evaluate(initChrom(chromosome))
     
     # Run the Genetic Algorithm Optimization
-    population_size = 4 # The number of solutions generated every time
+    population_size = 8 # The number of solutions generated every time
     num_generations = 50 # The number of generations, i.e how many times the populations will reproduce
     gene_length = len(chromosome)
 
