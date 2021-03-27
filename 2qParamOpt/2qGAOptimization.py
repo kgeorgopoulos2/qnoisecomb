@@ -754,10 +754,10 @@ def getIndividuals(creator, initChrom, n, chromosome):
     # Randomize the remaining rates
     for i in range(0, n-1):
         decodedRates = decode(initChrom(chromosome), scalar, num_rates, num_q)
-        rc0 = format(abs(int((decodedRates[0] + np.random.normal(0, 0.0002, 1))*scalar)), b)
-        rc1 = format(abs(int((decodedRates[1] + np.random.normal(0, 0.0002, 1))*scalar)), b)
-        rc2 = format(abs(int((decodedRates[2] + np.random.normal(0, 0.0002, 1))*scalar)), b)
-        rc3 = format(abs(int((decodedRates[3] + np.random.normal(0, 0.0002, 1))*scalar)), b)
+        rc0 = format(abs(int((decodedRates[0] + np.random.normal(0, 0.00005, 1))*scalar)), b)
+        rc1 = format(abs(int((decodedRates[1] + np.random.normal(0, 0.00005, 1))*scalar)), b)
+        rc2 = format(abs(int((decodedRates[2] + np.random.normal(0, 0.00005, 1))*scalar)), b)
+        rc3 = format(abs(int((decodedRates[3] + np.random.normal(0, 0.00005, 1))*scalar)), b)
         rc4 = format(abs(int((decodedRates[4] + np.random.normal(0, 0.005, 1))*scalar)), b)
         rc5 = format(abs(int((decodedRates[5] + np.random.normal(0, 0.005, 1))*scalar)), b)
         rc6 = format(abs(int((decodedRates[6] + np.random.normal(0, 0.005, 1))*scalar)), b)
@@ -795,7 +795,7 @@ def runGA(population_size, num_generations, gene_length, scalar, chromosome, num
     
     # Run the Genetic Algorithm
     start_time = time.time()
-    r = algorithms.eaSimple(population, toolbox, cxpb = 0.7, mutpb = 0.1, ngen = num_generations, verbose = False)
+    r = algorithms.eaSimple(population, toolbox, cxpb = 0.6, mutpb = 0.01, ngen = num_generations, verbose = False)
     end_time = time.time()
     print("\nTime elapsed:", end_time - start_time, "seconds.")
     
