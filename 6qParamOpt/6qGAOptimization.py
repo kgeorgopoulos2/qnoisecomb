@@ -818,7 +818,7 @@ def runGA(population_size, num_generations, gene_length, scalar, chromosome, num
     
     # Run the Genetic Algorithm
     start_time = time.time()
-    r = algorithms.eaSimple(population, toolbox, cxpb = 0.6, mutpb = 0.01, ngen = num_generations, verbose = False)
+    r = algorithms.eaSimple(population, toolbox, cxpb = 0.6, mutpb = 0.05, ngen = num_generations, verbose = False)
     end_time = time.time()
     print("\nTime elapsed:", end_time - start_time, "seconds.")
     
