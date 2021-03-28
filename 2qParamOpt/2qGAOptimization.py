@@ -701,8 +701,8 @@ def hd_evaluate(solution):
     scalar = 1000000
     num_rates = 9
     num_q = 4
-    avgExData = {'00': 168.5, '01': 326.8, '10': 135.1, '11': 369.6}
-    thermal = True
+    avgExData = {'00': 674, '01': 1307.2, '10': 540.4, '11': 1478.4}
+    thermal = False
     graph = [[0,1], [1,2], [2,3]] # The two-qubit gates that we are interested in
     gates = [0, 1, 2, 3] # The single-qubit gates that we are interested in
     device = provider.get_backend('ibmq_16_melbourne')
@@ -712,7 +712,7 @@ def hd_evaluate(solution):
     ratesList = decode(solution, scalar, num_rates, num_q)
     
     # Run simulation with the rates
-    iterations = 1000 # Probably always fixed on 1,000
+    iterations = 4000 # Probably always fixed on 1,000
     counts = combinedExecute(iterations, thermal, ratesList, device, T1s, T2s, graph, gates)
     counts = getCombinedCounts(counts, iterations)
     counts = dict(OrderedDict(sorted(counts.items())))
